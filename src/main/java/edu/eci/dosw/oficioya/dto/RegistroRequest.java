@@ -6,10 +6,14 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import edu.eci.dosw.oficioya.entity.Rol;
 
+/**
+ * DTO para el registro de un nuevo usuario.
+ */
 public record RegistroRequest(
         @NotBlank String nombre,
         @NotBlank @Email String correo,
         @NotBlank @Size(min = 8) String password,
+        @NotBlank String telefono,
         @NotNull Rol rol,
         String oficioPrincipal,
         String zona) {}
