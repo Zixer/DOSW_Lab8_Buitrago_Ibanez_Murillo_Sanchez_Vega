@@ -54,10 +54,7 @@ public class AuthServiceImpl implements AuthService {
                 guardado.getId(),
                 guardado.getNombre(),
                 guardado.getCorreo(),
-                guardado.getTelefono(),
-                guardado.getRol().name(),
-                guardado.getOficioPrincipal(),
-                guardado.getZona()
+                guardado.getRol().name()
         );
     }
 }

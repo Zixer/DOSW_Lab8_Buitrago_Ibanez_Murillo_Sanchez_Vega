@@ -36,10 +36,10 @@ class AuthControllerTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.id", notNullValue()))
                 .andExpect(jsonPath("$.nombre", is("Ana Pérez")))
                 .andExpect(jsonPath("$.correo", is("ana@test.com")))
-                .andExpect(jsonPath("$.telefono", is("5551234")))
+
                 .andExpect(jsonPath("$.rol", is("TRABAJADOR")))
-                .andExpect(jsonPath("$.oficioPrincipal", is("Carpintería")))
-                .andExpect(jsonPath("$.zona", is("Norte")))
+
+
                 .andExpect(jsonPath("$.passwordHash").doesNotExist());
     }
 
