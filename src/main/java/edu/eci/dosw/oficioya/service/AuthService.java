@@ -2,8 +2,10 @@ package edu.eci.dosw.oficioya.service;
 
 import edu.eci.dosw.oficioya.dto.LoginRequest;
 import edu.eci.dosw.oficioya.dto.LoginResponse;
-import edu.eci.dosw.oficioya.service.AuthService;
+import edu.eci.dosw.oficioya.dto.RegistroRequest;
+import edu.eci.dosw.oficioya.dto.UsuarioResponse;
 
 public interface AuthService {
-    LoginResponse login(LoginRequest req);
+    UsuarioResponse registrar(RegistroRequest request);
+    LoginResponse login(LoginRequest request);
 }
