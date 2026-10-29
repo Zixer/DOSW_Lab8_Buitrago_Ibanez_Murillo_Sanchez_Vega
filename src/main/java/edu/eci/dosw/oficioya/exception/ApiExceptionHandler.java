@@ -68,4 +68,12 @@ public class ApiExceptionHandler {
                                    request.getRequestURI());
         return new ResponseEntity<>(err, HttpStatus.BAD_REQUEST);
     }
+    @ExceptionHandler(CredencialesInvalidasException.class)
+    public ResponseEntity<ApiError> handleCredencialesInvalidas(CredencialesInvalidasException ex, HttpServletRequest request) {
+        ApiError err = ApiError.of(HttpStatus.UNAUTHORIZED.value(),
+                                   HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+                                   ex.getMessage(),
+                                   request.getRequestURI());
+        return new ResponseEntity<>(err, HttpStatus.UNAUTHORIZED);
+    }
 }

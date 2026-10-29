@@ -14,8 +14,13 @@ import edu.eci.dosw.oficioya.security.JwtService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.EnumSet;
+import java.util.Set;
+
 @Service
 public class AuthServiceImpl implements AuthService {
+
+    private static final Set<Rol> ROLES_PERMITIDOS = EnumSet.of(Rol.TRABAJADOR, Rol.CONTRATANTE);
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
@@ -29,8 +34,9 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public UsuarioResponse registrar(RegistroRequest request) {
-        if (request.rol() == Rol.ADMIN) {
-            throw new RolNoPermitidoException("No se permite registrar usuarios con rol ADMIN.");
+        
+        if (!ROLES_PERMITIDOS.contains(request.rol())) {
+            throw new RolNoPermitidoException("No se permite registrar usuarios con este rol.");
         }
 
         String correoNormalizado = request.correo().trim().toLowerCase();
@@ -45,6 +51,9 @@ public class AuthServiceImpl implements AuthService {
         usuario.setPasswordHash(passwordEncoder.encode(request.password()));
         usuario.setTelefono(request.telefono());
         usuario.setRol(request.rol());
+        
+        usuario.setOficioPrincipal(request.oficioPrincipal());
+        usuario.setZona(request.zona());
 
         Usuario guardado = usuarioRepository.save(usuario);
 

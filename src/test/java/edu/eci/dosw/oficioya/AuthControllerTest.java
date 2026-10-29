@@ -111,18 +111,35 @@ class AuthControllerTest extends BaseIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tokenType", is("Bearer")))
+                .andExpect(jsonPath("$.tipo", is("Bearer")))
                 .andExpect(jsonPath("$.accessToken", notNullValue()))
-                .andExpect(jsonPath("$.expiresIn", is(1800)));
+                .andExpect(jsonPath("$.expiraEn", is(1800)));
     }
 
     @Test
     void pt06_loginCredencialesIncorrectas() throws Exception {
+        // Caso 1: Correo inexistente
         LoginRequest loginInexistente = new LoginRequest("noexiste@test.com", "Password123!");
 
         mockMvc.perform(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(loginInexistente)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.mensaje", is("Credenciales inválidas")));
+
+        // Caso 2: Contraseña errónea de un usuario registrado
+        RegistroRequest registro = new RegistroRequest(
+                "Maria Test", "maria@test.com", "Password123!", "5558888", Rol.CONTRATANTE, "Asistente", "Norte");
+        mockMvc.perform(post("/api/v1/auth/registro")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(registro)))
+                .andExpect(status().isCreated());
+
+        LoginRequest passwordErronea = new LoginRequest("maria@test.com", "PasswordMalo999!");
+        mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(passwordErronea)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.mensaje", is("Credenciales inválidas")));
     }
 }

@@ -1,7 +1,7 @@
 package edu.eci.dosw.oficioya.dto;
 
 public record LoginResponse(
-        String tokenType,
+        String tipo,
         String accessToken,
-        long expiresIn
+        long expiraEn
 ) {}
