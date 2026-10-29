@@ -1,52 +1,59 @@
 package edu.eci.dosw.oficioya.service;
 
+import edu.eci.dosw.oficioya.dto.LoginRequest;
+import edu.eci.dosw.oficioya.dto.LoginResponse;
 import edu.eci.dosw.oficioya.dto.RegistroRequest;
 import edu.eci.dosw.oficioya.dto.UsuarioResponse;
 import edu.eci.dosw.oficioya.entity.Rol;
 import edu.eci.dosw.oficioya.entity.Usuario;
 import edu.eci.dosw.oficioya.exception.CorreoDuplicadoException;
+import edu.eci.dosw.oficioya.exception.CredencialesInvalidasException;
 import edu.eci.dosw.oficioya.exception.RolNoPermitidoException;
 import edu.eci.dosw.oficioya.repository.UsuarioRepository;
+import edu.eci.dosw.oficioya.security.JwtService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+
+import java.util.EnumSet;
+import java.util.Set;
 
 @Service
-@Transactional
 public class AuthServiceImpl implements AuthService {
+
+    private static final Set<Rol> ROLES_PERMITIDOS = EnumSet.of(Rol.TRABAJADOR, Rol.CONTRATANTE);
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
-    public AuthServiceImpl(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
+    public AuthServiceImpl(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
     }
 
     @Override
-    public UsuarioResponse registrar(RegistroRequest req) {
-        // Normalizar email
-        String email = req.correo().trim().toLowerCase();
-
-        // Validar rol permitido (solo TRABAJADOR o CONTRATANTE)
-        if (req.rol() != Rol.TRABAJADOR && req.rol() != Rol.CONTRATANTE) {
-            throw new RolNoPermitidoException(req.rol().name());
+    public UsuarioResponse registrar(RegistroRequest request) {
+        
+        if (!ROLES_PERMITIDOS.contains(request.rol())) {
+            throw new RolNoPermitidoException("No se permite registrar usuarios con este rol.");
         }
 
-        // Verificar correo duplicado
-        if (usuarioRepository.existsByCorreo(email)) {
-            throw new CorreoDuplicadoException(email);
+        String correoNormalizado = request.correo().trim().toLowerCase();
+
+        if (usuarioRepository.existsByCorreo(correoNormalizado)) {
+            throw new CorreoDuplicadoException("El correo ya se encuentra registrado.");
         }
 
-        // Crear entidad Usuario
         Usuario usuario = new Usuario();
-        usuario.setNombre(req.nombre());
-        usuario.setCorreo(email);
-        usuario.setTelefono(req.telefono());
-        usuario.setRol(req.rol());
-        usuario.setOficioPrincipal(req.oficioPrincipal());
-        usuario.setZona(req.zona());
-        usuario.setPasswordHash(passwordEncoder.encode(req.password()));
+        usuario.setNombre(request.nombre());
+        usuario.setCorreo(correoNormalizado);
+        usuario.setPasswordHash(passwordEncoder.encode(request.password()));
+        usuario.setTelefono(request.telefono());
+        usuario.setRol(request.rol());
+        
+        usuario.setOficioPrincipal(request.oficioPrincipal());
+        usuario.setZona(request.zona());
 
         Usuario guardado = usuarioRepository.save(usuario);
 
@@ -56,5 +63,22 @@ public class AuthServiceImpl implements AuthService {
                 guardado.getCorreo(),
                 guardado.getRol().name()
         );
+    }
+
+    @Override
+    public LoginResponse login(LoginRequest req) {
+        String correoNormalizado = req.correo().trim().toLowerCase();
+
+        Usuario usuario = usuarioRepository.findByCorreo(correoNormalizado)
+                .orElseThrow(CredencialesInvalidasException::new);
+
+        if (!passwordEncoder.matches(req.password(), usuario.getPasswordHash())) {
+            throw new CredencialesInvalidasException();
+        }
+
+        String token = jwtService.generar(usuario.getCorreo(), usuario.getRol().name());
+        long ttlSeconds = jwtService.getTtlSeconds();
+
+        return new LoginResponse("Bearer", token, ttlSeconds);
     }
 }
