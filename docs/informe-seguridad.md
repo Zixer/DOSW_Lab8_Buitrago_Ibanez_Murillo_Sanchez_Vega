@@ -16,3 +16,15 @@
 - **Ejemplo 404 Not Found:** Consultar una solicitud o un recurso con un ID inexistente o que pertenece a otro usuario.
 - **¿Por qué responde 404 a una solicitud ajena?:** Para evitar la enumeración de recursos. Si se respondiera 403, se le estaría confirmando al atacante que el recurso sí existe en la base de datos aunque no tenga acceso a él; el 404 oculta por completo su existencia.
 
+## 4. ¿Por qué el contratante no envía su propio id al crear una solicitud?
+- `SolicitudRequest` solo tiene `trabajadorId` y `descripcion`. El contratante sale del token: `SolicitudController` pasa `authentication.getName()` (el `sub` del JWT, ya validado por firma) y `SolicitudServiceImpl.crear` busca al usuario por ese correo.
+- Si el id viniera en el cuerpo, cualquier contratante podría crear o modificar solicitudes a nombre de otro con solo cambiar un número (control de acceso roto, OWASP A01). El cliente puede alterar el cuerpo, pero no puede alterar un token firmado sin la clave.
+ 
+## 5. ¿Por qué desactivaron CSRF? ¿Qué limitación tiene el cierre de sesión sin revocación de tokens?
+- **CSRF:** el ataque funciona porque el navegador adjunta solo las cookies de sesión. Esta API es stateless (`SessionCreationPolicy.STATELESS`), no usa cookies y exige el token en la cabecera `Authorization: Bearer`, que el navegador no envía por su cuenta. Una página maliciosa no puede forjar una petición autenticada. Si el token se moviera a una cookie, habría que volver a activar CSRF.
+- **Cierre de sesión:** el servidor no guarda sesiones. "Cerrar sesión" solo significa que el cliente borra el token. Un token robado sigue siendo válido hasta su `exp` (hasta 30 minutos). Para revocarlo haría falta una lista de tokens revocados (por `jti`), una versión de token por usuario o tokens de acceso muy cortos con refresh tokens revocables.
+ 
+## 6. ¿Qué pasaría si la clave del JWT se sube a GitHub, o si es corta? ¿Qué cambiarían para producción?
+- **Clave en GitHub:** cualquiera podría firmar tokens válidos con cualquier `sub` y `"role":"ADMIN"`. La autenticación y la autorización dejarían de servir. Habría que rotar la clave de inmediato (lo que invalida todos los tokens); borrarla del historial no basta porque ya pudo copiarse. Por eso llega por `JWT_SECRET` y `.env` está en `.gitignore`.
+- **Clave corta:** con un solo token capturado se puede probar claves por fuerza bruta sin conexión hasta encontrar la que reproduce la firma HS256. `JwtService` no arranca si la clave tiene menos de 32 bytes.
+- **Para producción:** clave en un gestor de secretos (Vault, AWS Secrets Manager) y rotación periódica; solo HTTPS; tokens de acceso cortos con refresh tokens revocables; límite de intentos en `/auth/login`; `ddl-auto=validate` con migraciones (Flyway); CORS restringido; mensajes de error genéricos en todos los casos; y considerar RS256, para que los servicios que validan solo tengan la clave pública.
