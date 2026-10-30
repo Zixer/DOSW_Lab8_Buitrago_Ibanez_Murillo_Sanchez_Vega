@@ -1,30 +1,28 @@
-# Informe de Seguridad - OficioYa
-
-## 1. ¿Dónde aparecen en su proyecto codificar, cifrar y hashear? ¿Por qué la contraseña se hashea y no se cifra?
-- **Hasheo:** Se utiliza mediante el algoritmo BCrypt (PasswordEncoder) en el flujo de registro e inicio de sesión para almacenar de forma segura las contraseñas de los usuarios. Se hashea y no se cifra porque las contraseñas nunca deben ser desencriptadas ni recuperadas en texto plano por el servidor; el proceso es unidireccional y se valida únicamente comparando hashes.
-- **Codificación:** Se aplica en la estructura del JWT (usando Base64URL para codificar la cabecera y el payload), permitiendo que cualquier cliente decodifique el formato pero sin alterar su autenticidad.
-- **Cifrado:** No se implementa directamente en las contraseñas, ya que el cifrado es bidireccional y requeriría una llave de desencriptación peligrosa si se viera comprometida.
-
-## 2. Decodificaron el payload de su token: ¿qué contiene, qué pasó cuando cambiaron el role a ADMIN y por qué el servidor lo detectó?
-- El payload contiene los claims estándar: sub (correo del usuario), role (rol asignado, ej. TRABAJADOR o CONTRATANTE), iss (emisor del token, oficioya), iat (fecha de emisión) y exp (fecha de expiración).
-- Al modificar manualmente el campo role a ADMIN (por ejemplo, en jwt.io), la firma criptográfica firmada con HS256 mediante la llave secreta del servidor deja de coincidir con el contenido alterado.
-- El servidor lo detecta automáticamente en el JwtAuthenticationFilter al momento de validar la firma con JwtService, rechazando la autenticación e invalidando la petición con un error 401 Unauthorized.
-
-## 3. Den un ejemplo de 401, 403 y 404 de su API. ¿Por qué una solicitud ajena responde 404 y no 403?
-- **Ejemplo 401 Unauthorized:** Intentar acceder a un endpoint protegido (como listar solicitudes) sin enviar el encabezado Authorization: Bearer <token> o enviando un token vencido o alterado.
-- **Ejemplo 403 Forbidden:** Un usuario con rol CONTRATANTE que intenta acceder a una ruta exclusiva de administración (/api/v1/admin/usuarios).
-- **Ejemplo 404 Not Found:** Consultar una solicitud o un recurso con un ID inexistente o que pertenece a otro usuario.
-- **¿Por qué responde 404 a una solicitud ajena?:** Para evitar la enumeración de recursos. Si se respondiera 403, se le estaría confirmando al atacante que el recurso sí existe en la base de datos aunque no tenga acceso a él; el 404 oculta por completo su existencia.
-
-## 4. ¿Por qué el contratante no envía su propio id al crear una solicitud?
-- `SolicitudRequest` solo tiene `trabajadorId` y `descripcion`. El contratante sale del token: `SolicitudController` pasa `authentication.getName()` (el `sub` del JWT, ya validado por firma) y `SolicitudServiceImpl.crear` busca al usuario por ese correo.
-- Si el id viniera en el cuerpo, cualquier contratante podría crear o modificar solicitudes a nombre de otro con solo cambiar un número (control de acceso roto, OWASP A01). El cliente puede alterar el cuerpo, pero no puede alterar un token firmado sin la clave.
+# Informe de seguridad · OficioYa
  
-## 5. ¿Por qué desactivaron CSRF? ¿Qué limitación tiene el cierre de sesión sin revocación de tokens?
-- **CSRF:** el ataque funciona porque el navegador adjunta solo las cookies de sesión. Esta API es stateless (`SessionCreationPolicy.STATELESS`), no usa cookies y exige el token en la cabecera `Authorization: Bearer`, que el navegador no envía por su cuenta. Una página maliciosa no puede forjar una petición autenticada. Si el token se moviera a una cookie, habría que volver a activar CSRF.
-- **Cierre de sesión:** el servidor no guarda sesiones. "Cerrar sesión" solo significa que el cliente borra el token. Un token robado sigue siendo válido hasta su `exp` (hasta 30 minutos). Para revocarlo haría falta una lista de tokens revocados (por `jti`), una versión de token por usuario o tokens de acceso muy cortos con refresh tokens revocables.
+## 1. Codificar, cifrar y hashear
+- **Codificar:** el JWT usa Base64URL en la cabecera y el payload. Es reversible y no protege nada: cualquiera puede leerlo en jwt.io.
+- **Hashear:** las contraseñas se guardan con BCrypt (`PasswordEncoder`); en `password_hash` solo hay valores `$2a$10$...`.
+- **Cifrar:** no se usa en las contraseñas. El cifrado es reversible y su clave podría filtrarse. El servidor nunca necesita recuperar la contraseña, solo compararla con `matches`, así que basta un hash de una sola vía.
  
-## 6. ¿Qué pasaría si la clave del JWT se sube a GitHub, o si es corta? ¿Qué cambiarían para producción?
-- **Clave en GitHub:** cualquiera podría firmar tokens válidos con cualquier `sub` y `"role":"ADMIN"`. La autenticación y la autorización dejarían de servir. Habría que rotar la clave de inmediato (lo que invalida todos los tokens); borrarla del historial no basta porque ya pudo copiarse. Por eso llega por `JWT_SECRET` y `.env` está en `.gitignore`.
-- **Clave corta:** con un solo token capturado se puede probar claves por fuerza bruta sin conexión hasta encontrar la que reproduce la firma HS256. `JwtService` no arranca si la clave tiene menos de 32 bytes.
-- **Para producción:** clave en un gestor de secretos (Vault, AWS Secrets Manager) y rotación periódica; solo HTTPS; tokens de acceso cortos con refresh tokens revocables; límite de intentos en `/auth/login`; `ddl-auto=validate` con migraciones (Flyway); CORS restringido; mensajes de error genéricos en todos los casos; y considerar RS256, para que los servicios que validan solo tengan la clave pública.
+## 2. Payload del token y cambio de rol
+El payload solo lleva `sub` (correo), `role`, `iss` (`oficioya`), `iat` y `exp`, sin contraseña ni teléfono. Al cambiar `role` a `ADMIN` y conservar la firma original, la API respondió `401`. `JwtService` recalcula la firma HS256 con `JWT_SECRET` y ya no coincide con el contenido; sin la clave no se puede firmar el payload alterado (ataque 2).
+ 
+## 3. Ejemplos de 401, 403 y 404
+- **401:** `GET /solicitudes` sin token, o con un token alterado o vencido.
+- **403:** un `CONTRATANTE` en `GET /admin/usuarios`: el servidor sabe quién es, pero su rol no alcanza.
+- **404:** Luis pide la solicitud 1, que es de Ana.
+ 
+Una solicitud ajena responde `404` y no `403` porque un `403` confirmaría que existe. La consulta incluye al participante, así que una solicitud ajena y una inexistente reciben la misma respuesta.
+ 
+## 4. ¿Por qué el contratante no envía su id?
+`SolicitudRequest` solo tiene `trabajadorId` y `descripcion`. El contratante sale de `authentication.getName()`, es decir, del `sub` de un token con firma verificada. Si el id viniera en el cuerpo, cualquiera podría crear solicitudes a nombre de otro con solo cambiar un número (OWASP A01).
+ 
+## 5. CSRF y cierre de sesión
+- **CSRF:** el ataque aprovecha las cookies que el navegador envía solo. Esta API es stateless, no usa cookies y exige el token en `Authorization: Bearer`, que el navegador no adjunta por su cuenta. Si el token pasara a una cookie, habría que reactivar CSRF.
+- **Cierre de sesión:** el servidor no guarda sesiones, así que cerrar sesión solo borra el token del cliente. Un token robado sigue sirviendo hasta su `exp` (máximo 30 minutos). Para revocarlo haría falta una lista de tokens revocados o tokens cortos con refresh tokens.
+ 
+## 6. Clave del JWT y producción
+- **Si se sube a GitHub:** cualquiera puede firmar tokens con `"role":"ADMIN"`. Habría que rotarla de inmediato, porque borrarla del historial no basta. Por eso llega por `JWT_SECRET` y `.env` está en `.gitignore`.
+- **Si es corta:** con un token capturado se puede adivinar por fuerza bruta. `JwtService` no arranca con menos de 32 bytes.
+- **Para producción:** clave en un gestor de secretos con rotación; solo HTTPS; tokens cortos con refresh tokens; límite de intentos en el login; mensajes de error genéricos en todos los casos; y considerar RS256, para que los servicios que validan solo tengan la clave pública.
