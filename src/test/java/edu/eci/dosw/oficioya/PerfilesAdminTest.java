@@ -54,6 +54,18 @@ class PerfilesAdminTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.telefono").doesNotExist())
                 .andExpect(jsonPath("$.passwordHash").doesNotExist());
     }
+        // El 404 de un trabajador inexistente usa el formato ApiError
+    @Test
+    @WithMockUser(username = "cliente@example.com", roles = "CONTRATANTE")
+    @DisplayName("Trabajador inexistente responde 404 con formato ApiError")
+    void trabajadorInexistente() throws Exception {
+
+        mockMvc.perform(get("/api/v1/trabajadores/{id}", 999999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.mensaje").value("Trabajador no encontrado"))
+                .andExpect(jsonPath("$.ruta").value("/api/v1/trabajadores/999999"));
+    }
 
     // PT-11: Un contratante no puede consultar administracion
     @Test

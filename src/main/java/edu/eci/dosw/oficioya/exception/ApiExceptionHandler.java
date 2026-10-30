@@ -76,4 +76,13 @@ public class ApiExceptionHandler {
                                    request.getRequestURI());
         return new ResponseEntity<>(err, HttpStatus.UNAUTHORIZED);
     }
+
+        @ExceptionHandler(RecursoNoEncontradoException.class)
+    public ResponseEntity<ApiError> handleRecursoNoEncontrado(RecursoNoEncontradoException ex, HttpServletRequest request) {
+        ApiError err = ApiError.of(HttpStatus.NOT_FOUND.value(),
+                                   HttpStatus.NOT_FOUND.getReasonPhrase(),
+                                   ex.getMessage(),
+                                   request.getRequestURI());
+        return new ResponseEntity<>(err, HttpStatus.NOT_FOUND);
+    }
 }

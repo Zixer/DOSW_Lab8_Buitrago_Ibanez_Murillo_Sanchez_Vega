@@ -11,8 +11,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
+import edu.eci.dosw.oficioya.exception.RecursoNoEncontradoException;
 
 @Service
 @Transactional(readOnly = true)
@@ -27,7 +26,7 @@ public class UsuarioServiceImpl implements UsuarioService {
     @Override
     public UsuarioMeResponse obtenerMiPerfil(String correoAutenticado) {
 
-        Usuario usuario = usuarioRepository.findByCorreo(correoAutenticado).orElseThrow(() -> new IllegalStateException("Usuario autenticado no encontrado"));
+                Usuario usuario = usuarioRepository.findByCorreo(correoAutenticado).orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
 
         return new UsuarioMeResponse(
                 usuario.getId(),
@@ -49,11 +48,7 @@ public class UsuarioServiceImpl implements UsuarioService {
     @Override
     public PerfilPublico obtenerTrabajador(Long id) {
 
-        Usuario usuario = usuarioRepository.findById(id).filter(u -> u.getRol() == Rol.TRABAJADOR).orElseThrow(() -> new ResponseStatusException(
-                                HttpStatus.NOT_FOUND,
-                                "Trabajador no encontrado"
-                            ));
-
+        Usuario usuario = usuarioRepository.findById(id).filter(u -> u.getRol() == Rol.TRABAJADOR).orElseThrow(() -> new RecursoNoEncontradoException("Trabajador no encontrado"));
         return convertirAPerfilPublico(usuario);
     }
 
