@@ -85,4 +85,13 @@ public class ApiExceptionHandler {
                                    request.getRequestURI());
         return new ResponseEntity<>(err, HttpStatus.NOT_FOUND);
     }
+
+        @ExceptionHandler(EstadoInvalidoException.class)
+    public ResponseEntity<ApiError> handleEstadoInvalido(EstadoInvalidoException ex, HttpServletRequest request) {
+        ApiError err = ApiError.of(HttpStatus.CONFLICT.value(),
+                                   HttpStatus.CONFLICT.getReasonPhrase(),
+                                   ex.getMessage(),
+                                   request.getRequestURI());
+        return new ResponseEntity<>(err, HttpStatus.CONFLICT);
+    }
 }
